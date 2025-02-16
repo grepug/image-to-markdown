@@ -12,77 +12,89 @@ struct MainController: RouteCollection {
         }
 
         let input = try req.content.decode(Input.self)
-
         let orderedFiles = input.images.sorted { $0.filename < $1.filename }
-        let client = req.client
 
-        let appId = Environment.get("x-ti-app-id")!
-        let appKey = Environment.get("x-ti-secret-code")!
+        print("filenames", orderedFiles.map { $0.filename })
 
-        var blocks: [String] = []
-        var firstBlockPos: Int?
+        typealias Detail = ApiResponse.Result.Detail
 
-        for file in orderedFiles {
-            let fileData = Data(buffer: file.data)
-            let response = try await client.post("https://api.textin.com/ai/service/v1/pdf_to_markdown") { req in
-                req.headers.add(name: "x-ti-app-id", value: appId)
-                req.headers.add(name: "x-ti-secret-code", value: appKey)
-                req.headers.contentType = .binary
-                req.body = .init(data: fileData)
+        let blocks: [String] = try await withThrowingTaskGroup(of: (String, Int).self) { group in
+            for (index, file) in orderedFiles.enumerated() {
+                group.addTask {
+                    let details = try await getImageDetail(file: file, req: req)
+                    let text = try await extractText(from: details, req: req)
+
+                    return (text, index)
+                }
+
             }
 
-            let res = try response.content.decode(ApiResponse.self)
-            let items: [ApiResponse.Result.Detail] = res.result.detail.reduce(into: []) { partialResult, item in
-                if item.sub_type.discardable {
-                    return
-                }
-
-                let pos = item.position.first ?? 0
-
-                if firstBlockPos == nil {
-                    firstBlockPos = pos
-                }
-
-                // pos must be between firstBlockPos +- 10
-                if let firstBlockPos = firstBlockPos, abs(firstBlockPos - pos) > 10 {
-                    return
-                }
-
+            let res: [(String, Int)] = try await group.reduce(into: []) { partialResult, item in
                 partialResult.append(item)
             }
 
-            let newBlocks = try await withThrowingTaskGroup(of: (String, Int).self) { group in
-                for (index, item) in items.enumerated() {
-                    group.addTask {
-                        let res = try await req.aiCompletion.generate(
-                            completion: FormatOCRTextCompletion(
-                                input: .init(text: item.text)
-                            )
-                        )
-
-                        if item.sub_type == .text_title {
-                            return ("## \(res)", index)
-                        } else {
-                            return (res, index)
-                        }
-                    }
-                }
-
-                let res: [(String, Int)] = try await group.reduce(into: []) { partialResult, item in
-                    partialResult.append(item)
-                }
-
-                return res.sorted { $0.1 < $1.1 }.map { $0.0 }
-            }
-
-            blocks.append(contentsOf: newBlocks)
+            return res.sorted { $0.1 < $1.1 }.map { $0.0 }
         }
 
-        let markdown = blocks.joined(separator: "\n\n")
+        let markdown = blocks.joined(separator: "\n")
+            // replace only \n to \n\n
+            .replacingOccurrences(of: "\n(?!\n)", with: "\n\n", options: .regularExpression)
+            // replace more than 2 \n to 2 \n
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
 
         print("Markdown: \(markdown)")
 
         return try await req.view.render("result", ["markdown": markdown])
+    }
+
+    func getImageDetail(file: File, req: Request) async throws -> [ApiResponse.Result.Detail] {
+        let fileData = Data(buffer: file.data)
+
+        let appId = Environment.get("x-ti-app-id")!
+        let appKey = Environment.get("x-ti-secret-code")!
+
+        let response = try await req.client.post("https://api.textin.com/ai/service/v1/pdf_to_markdown") { req in
+            req.headers.add(name: "x-ti-app-id", value: appId)
+            req.headers.add(name: "x-ti-secret-code", value: appKey)
+            req.headers.contentType = .binary
+            req.body = .init(data: fileData)
+        }
+
+        let res = try response.content.decode(ApiResponse.self)
+        return res.result.detail
+    }
+
+    func extractText(from detail: [ApiResponse.Result.Detail], req: Request) async throws -> String {
+        var text = ""
+        var firstBlockPos: Int?
+
+        for item in detail {
+            if item.sub_type.discardable {
+                continue
+            }
+
+            let pos = item.position.first ?? 0
+
+            if firstBlockPos == nil {
+                firstBlockPos = pos
+            }
+
+            // pos must be between firstBlockPos +- 10
+            if let firstBlockPos = firstBlockPos, abs(firstBlockPos - pos) > 10 {
+                continue
+            }
+
+            if item.sub_type == .text_title {
+                text += "## \(item.text)\n\n"
+            } else {
+                text += item.text + "\n\n"
+            }
+        }
+
+        let completion = FormatOCRTextCompletion(input: .init(text: text))
+        let res = try await req.aiCompletion.generate(completion: completion)
+
+        return res
     }
 }
 

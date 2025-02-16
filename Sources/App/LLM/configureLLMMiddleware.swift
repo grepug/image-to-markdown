@@ -6,10 +6,14 @@ import Vapor
 struct PromptTemplateProvider: AIPromptTemplateProvider {
     func promptTemplate(forKey key: String) async throws -> String {
         """
-        Make the following text which is ocred from the image better in format, \
-        don't change the content itself!!! \
-        and remove something like the date which seems like a footer at end of the text: \
-        (only output the formatted text, no other information)
+        Make the following text which is from ocr from the image better in format:
+
+        1. don't change the content itself!!!
+        2. remove something like the date which seems like a footer at end of the text
+        3. the following text is from ocr, so the line breaks are possibly wrong(it breaks on small piece of text), remove unnecessary them, \
+        and don't remove line breaks that are reasonable
+        4. you should give double line breaks between paragraphs
+        5. only output the formatted text, no other information
 
         text: {{text}}
         """
