@@ -32,8 +32,10 @@
 
     <script>
         function copyToClipboard() {
-            const markdownResult = document.querySelector('.markdown-result').innerText;
-            navigator.clipboard.writeText(markdownResult).then(() => {
+            const parser = new DOMParser();
+            const content = parser.parseFromString(markdownContent, 'text/html').body.textContent;
+
+            navigator.clipboard.writeText(content).then(() => {
                 alert('Markdown copied to clipboard!');
             }).catch(err => {
                 console.error('Failed to copy: ', err);
@@ -42,7 +44,8 @@
     </script>
       <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
       <script>
-       document.getElementById('content').innerHTML = marked.parse(`#(markdown)`);
+        var markdownContent = `#(markdown)`;
+       document.getElementById('content').innerHTML = marked.parse(markdownContent);
       </script>
 </body>
 </html>

@@ -13,6 +13,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
         // 🍃 An extensible templating language built for Swift.
         .package(url: "https://github.com/vapor/leaf.git", from: "4.4.0"),
+        .package(url: "https://github.com/grepug/swift-ai.git", branch: "main"),
+        .package(url: "https://github.com/grepug/swift-ai-vapor.git", branch: "main"),
     ],
     targets: [
         .executableTarget(
@@ -22,6 +24,8 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "Leaf", package: "leaf"),
+                .product(name: "SwiftAI", package: "swift-ai"),
+                .product(name: "SwiftAIVapor", package: "swift-ai-vapor"),
             ],
             swiftSettings: swiftSettings
         ),

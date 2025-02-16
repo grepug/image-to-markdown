@@ -7,10 +7,6 @@ struct MainController: RouteCollection {
 
     @Sendable
     func index(req: Request) async throws -> View {
-        if let data = req.body.data {
-            print(data)
-        }
-
         struct Input: Content {
             var images: [File]
         }
@@ -36,13 +32,10 @@ struct MainController: RouteCollection {
             }
 
             let res = try response.content.decode(ApiResponse.self)
-
-            for item in res.result.detail {
-                guard !item.sub_type.discardable else {
-                    continue
+            let items: [ApiResponse.Result.Detail] = res.result.detail.reduce(into: []) { partialResult, item in
+                if item.sub_type.discardable {
+                    return
                 }
-
-                var text = item.text
 
                 let pos = item.position.first ?? 0
 
@@ -52,18 +45,42 @@ struct MainController: RouteCollection {
 
                 // pos must be between firstBlockPos +- 10
                 if let firstBlockPos = firstBlockPos, abs(firstBlockPos - pos) > 10 {
-                    continue
+                    return
                 }
 
-                if item.sub_type == .text_title {
-                    text = "## \(text)"
-                }
-
-                blocks.append(text)
+                partialResult.append(item)
             }
+
+            let newBlocks = try await withThrowingTaskGroup(of: (String, Int).self) { group in
+                for (index, item) in items.enumerated() {
+                    group.addTask {
+                        let res = try await req.aiCompletion.generate(
+                            completion: FormatOCRTextCompletion(
+                                input: .init(text: item.text)
+                            )
+                        )
+
+                        if item.sub_type == .text_title {
+                            return ("## \(res)", index)
+                        } else {
+                            return (res, index)
+                        }
+                    }
+                }
+
+                let res: [(String, Int)] = try await group.reduce(into: []) { partialResult, item in
+                    partialResult.append(item)
+                }
+
+                return res.sorted { $0.1 < $1.1 }.map { $0.0 }
+            }
+
+            blocks.append(contentsOf: newBlocks)
         }
 
         let markdown = blocks.joined(separator: "\n\n")
+
+        print("Markdown: \(markdown)")
 
         return try await req.view.render("result", ["markdown": markdown])
     }

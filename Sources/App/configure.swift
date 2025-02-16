@@ -8,5 +8,7 @@ public func configure(_ app: Application) async throws {
     // register routes
     app.views.use(.leaf)
 
+    try configureAIMiddleware(app)
+
     try routes(app)
 }
