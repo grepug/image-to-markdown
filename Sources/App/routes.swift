@@ -1,11 +1,11 @@
 import Vapor
 
 func routes(_ app: Application) throws {
-    app.get { req async in
-        "It works!"
+    app.routes.defaultMaxBodySize = "10mb"
+
+    app.get { req async throws -> View in
+        return try await req.view.render("index", ["name": "Leaf"])
     }
 
-    app.get("hello") { req async -> String in
-        "Hello, world!"
-    }
+    try app.register(collection: MainController())
 }

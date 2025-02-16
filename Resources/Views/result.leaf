@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Result</title>
+    <style>
+        .copy-button {
+            margin-bottom: 10px;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .copy-button:hover {
+            background-color: #45a049;
+        }
+        .markdown-result {
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <button class="copy-button" onclick="copyToClipboard()">Copy</button>
+    <div class="markdown-result" id="content">
+        
+    </div>
+
+    <script>
+        function copyToClipboard() {
+            const markdownResult = document.querySelector('.markdown-result').innerText;
+            navigator.clipboard.writeText(markdownResult).then(() => {
+                alert('Markdown copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        }
+    </script>
+      <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+      <script>
+       document.getElementById('content').innerHTML = marked.parse(`#(markdown)`);
+      </script>
+</body>
+</html>
