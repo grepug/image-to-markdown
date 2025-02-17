@@ -102,7 +102,7 @@ struct ApiResponse: Content {
     struct Result: Content {
         var markdown: String
         var success_count: Int
-        var pages: [Page]
+        // var pages: [Page]
         var detail: [Detail]
 
         struct Page: Content {
