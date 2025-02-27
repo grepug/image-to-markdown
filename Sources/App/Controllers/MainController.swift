@@ -14,8 +14,6 @@ struct MainController: RouteCollection {
         let input = try req.content.decode(Input.self)
         let orderedFiles = input.images.sorted { $0.filename < $1.filename }
 
-        print("filenames", orderedFiles.map { $0.filename })
-
         typealias Detail = ApiResponse.Result.Detail
 
         let blocks: [String] = try await withThrowingTaskGroup(of: (String, Int).self) { group in
@@ -69,11 +67,15 @@ struct MainController: RouteCollection {
         var firstBlockPos: Int?
 
         for item in detail {
-            if item.sub_type.discardable {
+            if item.sub_type?.discardable ?? true {
                 continue
             }
 
             let pos = item.position.first ?? 0
+
+            guard pos < 100 else {
+                continue
+            }
 
             if firstBlockPos == nil {
                 firstBlockPos = pos
@@ -146,13 +148,13 @@ struct ApiResponse: Content {
 
             var paragraph_id: Int
             var page_id: Int
-            var tags: [String]
+            var tags: [String]?
             var outline_level: Int
             var text: String
             var type: String
             var position: [Int]
             var content: Int
-            var sub_type: SubType
+            var sub_type: SubType?
         }
     }
 
